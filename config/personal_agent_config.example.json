@@ -1,0 +1,112 @@
+{
+  "active_database_profile": "clickhouse.analytics",
+  "date_range": "7 days",
+  "lookback": "30 days",
+  "profile_schema": {
+    "enabled": true,
+    "directory": "config/profile_schemas",
+    "create_if_missing": true,
+    "common_parameter_min_events": 3,
+    "notes": "Generated parameter entries use [type, up_to_5_examples, priority]. Event blocks contain every parameter not classified as system or common."
+  },
+  "parameter_quality": {
+    "tables": {
+      "event_example": {
+        "exclude_parameters": [
+          "optional_note"
+        ],
+        "parameters": {
+          "amount": {
+            "min_value": 0
+          }
+        }
+      }
+    }
+  },
+  "database_profiles": {
+    "clickhouse.analytics": {
+      "kind": "clickhouse",
+      "database": "analytics",
+      "main_identifier": "user_id",
+      "table_name_prefixes": [
+        "event_"
+      ],
+      "table_blacklist": []
+    },
+    "clickhouse.analytics_next": {
+      "kind": "clickhouse",
+      "database": "analytics_next",
+      "main_identifier": "user_id",
+      "table_name_prefixes": [
+        "event_"
+      ],
+      "table_blacklist": []
+    }
+  },
+  "table_blacklist": [
+    "event_debug_*",
+    "event_test_*"
+  ],
+  "event_groups": {
+    "same_second_allowed": {
+      "tables": [
+        "event_click",
+        "event_reward",
+        "event_activity"
+      ],
+      "notes": "Events in this group may naturally happen at the same timestamp for one adid."
+    },
+    "same_second_strict": {
+      "tables": [
+        "event_purchase",
+        "event_login",
+        "event_signup"
+      ],
+      "notes": "Same-second bursts for these events should be investigated unless event_context has an explicit exception."
+    },
+    "missing_main_identifier_allowed": {
+      "tables": [
+        "event_first_open"
+      ],
+      "notes": "Events in this group may fire before the configured main identifier is assigned."
+    },
+    "missing_session_id_allowed": {
+      "tables": [
+        "event_first_open"
+      ],
+      "notes": "Events in this group may fire before a session identifier (session_id or session_uuid) is assigned."
+    }
+  },
+  "event_context": {
+    "event_first_open": {
+      "can_trigger_before_login": true,
+      "skip_main_identifier_check": true,
+      "skip_session_id_check": true,
+      "notes": "Example: early entry event before a user/session is assigned."
+    }
+  },
+  "quality_definitions": {
+    "future_event_time": {
+      "enabled": true
+    }
+  },
+  "db_problem_scan": {
+    "scan_max_event_tables": 200
+  },
+  "drilldown": {
+    "max_tables": 200
+  },
+  "thresholds": {
+    "duplicate_pct": 0.01,
+    "replicated_pct": 0.01,
+    "same_second_burst_pct": 0.01,
+    "suspicious_high_delta_pct": 0.2,
+    "suspicious_low_delta_pct": 0.2,
+    "suspicious_volume_min_expected_rows": 10,
+    "new_activity_min_rows": 100,
+    "missing_adid_pct": 0.01,
+    "missing_main_identifier_pct": 0.01,
+    "missing_session_id_pct": 0.01,
+    "missing_event_key_pct": 0.01
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "clickhouse": {
+    "host": "localhost",
+    "port": 8123,
+    "user": "default",
+    "password": "",
+    "secure": false
+  },
+  "llm": {
+    "base_url": "http://localhost:1234/v1",
+    "model": "active",
+    "api_key": ""
+  }
+}

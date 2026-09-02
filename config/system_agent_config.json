@@ -1,0 +1,226 @@
+{
+  "date_range": {
+    "default_days_back": 7,
+    "notes": "Measurement window. Use date_range: \"1 hour\", \"2 hours\", or \"7 days\" for a rolling window, or an inclusive fixed date range. Legacy object forms remain supported."
+  },
+  "lookback": {
+    "default_days_back": 30,
+    "notes": "Historical baseline used to infer expected event volume, parameter presence, and parameter value shape. Findings are always measured in date_range."
+  },
+  "llm": {
+    "base_url": "http://localhost:1234/v1",
+    "model": "active",
+    "max_tokens": 12000,
+    "api_key": "",
+    "notes": "Public-safe default. The runtime resolves active to the currently loaded LM Studio model, preferring OSS models. Local-model responses default to a larger token cap because the expected runtime has enough resources."
+  },
+  "quality_definitions": {
+    "duplicate": {
+      "label": "duplicate",
+      "definition": "Extra rows sharing the same event timestamp, adid, and event_key.",
+      "default_group_by": [
+        "event_date",
+        "adid",
+        "event_key"
+      ],
+      "metric": "duplicate_pct",
+      "classification": "confirmed_problem"
+    },
+    "replicated": {
+      "label": "replicated",
+      "definition": "Extra distinct event timestamp and adid occurrences beyond the first occurrence of each event_key in the selected period.",
+      "default_group_by": [
+        "event_key",
+        "event_date",
+        "adid"
+      ],
+      "metric": "replicated_pct",
+      "classification": "confirmed_problem"
+    },
+    "same_second_burst": {
+      "label": "same_second_burst",
+      "definition": "Rows where one adid produces several different event_key values at the same timestamp.",
+      "default_group_by": [
+        "event_date",
+        "adid"
+      ],
+      "default_unique_event_key_threshold": 3,
+      "classification": "needs_investigation_unless_same_second_allowed"
+    },
+    "suspicious_high": {
+      "label": "suspicious_high",
+      "definition": "The selected date_range row count is at least the configured percentage above the amount expected from the historical lookback.",
+      "threshold_source": "thresholds.suspicious_high_delta_pct",
+      "baseline": "Expected rows for the selected window, scaled from the preceding historical lookback.",
+      "default_delta_pct": 0.2,
+      "classification": "needs_investigation"
+    },
+    "suspicious_low": {
+      "label": "suspicious_low",
+      "definition": "The selected date_range row count is at least the configured percentage below the amount expected from the historical lookback.",
+      "threshold_source": "thresholds.suspicious_low_delta_pct",
+      "baseline": "Expected rows for the selected window, scaled from the preceding historical lookback.",
+      "default_delta_pct": 0.2,
+      "classification": "needs_investigation"
+    },
+    "future_event_time": {
+      "label": "future_event_time",
+      "enabled": true,
+      "definition": "event_date is more than the configured tolerance into the future.",
+      "future_tolerance_minutes": 10,
+      "classification": "confirmed_problem"
+    },
+    "missing_identifier": {
+      "label": "missing_identifier",
+      "definition": "Identifier is NULL, empty, all-zero UUID, or string 'null'.",
+      "identifiers": [
+        "adid",
+        "user_id",
+        "session_id",
+        "event_key"
+      ],
+      "aliases": {
+        "adid": [
+          "adid"
+        ],
+        "user_id": [
+          "user_id"
+        ],
+        "session_id": [
+          "session_id",
+          "session_uuid",
+          "sessions_uuid"
+        ],
+        "event_key": [
+          "event_key"
+        ]
+      },
+      "allowed_group_sources": [
+        "event_groups.missing_main_identifier_allowed",
+        "event_groups.missing_session_id_allowed"
+      ],
+      "classification": "confirmed_problem_unless_expected_context"
+    },
+    "no_rows": {
+      "label": "no_rows",
+      "definition": "Table has zero rows in the configured period. Severity is critical when matching source_events rows are also zero, and low when matching source_events rows exist.",
+      "classification": "requires_source_events_comparison_for_severity"
+    }
+  },
+  "thresholds": {
+    "missing_adid_pct": 0.01,
+    "missing_main_identifier_pct": 0.01,
+    "missing_session_id_pct": 0.01,
+    "missing_event_key_pct": 0.01,
+    "duplicate_pct": 0.01,
+    "replicated_pct": 0.01,
+    "same_second_burst_pct": 0.01,
+    "suspicious_high_delta_pct": 0.2,
+    "suspicious_low_delta_pct": 0.2,
+    "suspicious_volume_min_expected_rows": 10,
+    "new_activity_min_rows": 100
+  },
+  "classification_rules": {
+    "duplicate_high": "confirmed_problem",
+    "replicated_high": "confirmed_problem",
+    "same_second_burst_high": "needs_investigation_unless_same_second_allowed",
+    "suspicious_high": "needs_investigation",
+    "suspicious_low": "needs_investigation",
+    "missing_adid_high": "confirmed_problem",
+    "missing_main_identifier_high": "confirmed_problem_unless_expected_context",
+    "missing_session_id_high": "confirmed_problem_unless_expected_context",
+    "no_rows_in_range": "requires_source_events_comparison_for_severity",
+    "no_rows_yesterday": "legacy_alias_for_no_rows_in_range"
+  },
+  "source_flow": {
+    "raw_table": "source_events",
+    "dlq_tables": [
+      "source_events_dlq",
+      "partner_events_dlq"
+    ],
+    "source_comparison_excluded_tables": [
+      "partner_events"
+    ],
+    "max_parameter_checks": 100,
+    "notes": "Compares BI source payload event types and missing parameter findings with parsed event tables. Missing parsed and raw events or parameters are critical; raw values present but parsed values missing are low. partner_events is intentionally not queried. Every source_events_dlq or partner_events_dlq row remains critical failure-path evidence."
+  },
+  "profile_schema": {
+    "enabled": true,
+    "directory": "config/profile_schemas",
+    "create_if_missing": true,
+    "common_parameter_min_events": 3,
+    "notes": "Creates config/profile_schemas/<active-profile>.json only when absent. Compact v3 files define each system/common parameter once as [type, up_to_5_examples, priority], and keep every non-system/non-common parameter under its event. Set an event parameter to null to ignore it whether its physical column exists or not. Source-flow checks append newly observed raw-only events as required=false contracts with source-inferred parameter examples; existing events and manual values are never replaced."
+  },
+  "parameter_quality": {
+    "enabled": true,
+    "defaults": {
+      "invalid_values": [
+        "N/A",
+        "NA",
+        "unknown",
+        "undefined",
+        "none",
+        "-"
+      ],
+      "max_missing_pct": 0.0,
+      "max_invalid_pct": 0.0,
+      "top_values_limit": 10
+    },
+    "auto_discovery": {
+      "enabled": true,
+      "exclude_columns": [
+        "event_date",
+        "event_key",
+        "adid",
+        "user_id",
+        "session_id",
+        "session_uuid",
+        "sessions_uuid",
+        "device_hash",
+        "created_at",
+        "loaded_at",
+        "updated_at",
+        "meta_data",
+        "meta_data_jsonb",
+        "server_supported_versions"
+      ],
+      "exclude_patterns": [
+        "*_json",
+        "*_jsonb"
+      ],
+      "required_min_presence_pct": 0.95,
+      "flag_unpopulated": true,
+      "default_rule": {
+        "required_value": "auto"
+      }
+    },
+    "global_parameters": {
+      "region": {
+        "required_value": true,
+        "require_column": false,
+        "allowed_pattern": "^[A-Z]{2}$"
+      }
+    },
+    "tables": {},
+    "notes": "Checks current parameter missing/invalid rates inside date_range. The shared lookback is used only to infer normal presence and observed value shape. Legacy parameter_quality.date_range is accepted as a lookback alias. Use auto_discovery exclusions or table exclude_parameters for optional/technical fields, and table parameters only for rule overrides."
+  },
+  "ai_db_agent": {
+    "days_back": 7,
+    "max_inventory_tables": 80,
+    "max_iterations": 2,
+    "max_queries_per_iteration": 3,
+    "result_preview_rows": 12
+  },
+  "db_problem_scan": {
+    "days_back": 7,
+    "max_tables": 200,
+    "scan_max_event_tables": 200
+  },
+  "collection": {
+    "workers": 4
+  },
+  "drilldown": {
+    "max_tables": 200,
+    "print_limit": 20
+  }
+}

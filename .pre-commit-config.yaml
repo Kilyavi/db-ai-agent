@@ -1,0 +1,8 @@
+repos:
+  - repo: local
+    hooks:
+      - id: git-safety-check
+        name: Git safety check
+        entry: python tools/check_git_safety.py
+        language: system
+        pass_filenames: false
